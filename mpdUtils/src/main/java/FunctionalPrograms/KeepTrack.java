@@ -32,6 +32,4 @@ public class KeepTrack<T> implements Query {
 
     }
 
-
-
 }

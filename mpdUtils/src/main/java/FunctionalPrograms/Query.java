@@ -6,6 +6,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.function.BiFunction;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
+import java.util.function.UnaryOperator;
 import java.util.stream.Stream;
 
 public interface Query<T> {
@@ -46,7 +47,6 @@ public interface Query<T> {
         while (tryAdvance(action)) ;
     }
 
-
     default Query<T> concat(Query<T> other) {
         return cons -> {
             forEach(cons::accept);
@@ -63,22 +63,72 @@ public interface Query<T> {
         };
     }
 
-    static <T> CompletableFuture<Boolean> all(Stream<CompletableFuture<T>> cfs,Predicate<T> pred) {
-        return cfs
-                .map(cf -> cf.thenApply(pred::test))
-                .reduce((prev, curr) -> CompletableFuture.supplyAsync(()->prev.join()&&curr.join()))
-                    /*boolean b[] = {true};
-                    prev.thenApplyAsync(t->{b[0]&=t;return t;});
-                    curr.thenApplyAsync(t->{b[0]&=t;return t;});
-                    return CompletableFuture.supplyAsync(() -> b[0]);*/
-                .get();
+    public default List<T> toList() {
+        List<T> list = new ArrayList<>();
+        while (tryAdvance(list::add));
+        return list;
     }
 
-    static <T> CompletableFuture<T> first(Stream<CompletableFuture<T>> cfs,Predicate<T> pred) {
-        return cfs
-                .reduce((prev, curr) -> pred.test(prev.join()) ? prev : curr)
-                .orElse(CompletableFuture.completedFuture(null))
-                ;
+    default Query<T> Union(Query<T> other) {
+        List<T> elems = new ArrayList<>();
+        List<T> elems2= new ArrayList<>();
+        boolean[] first = {true};
+        return cons -> {
+            if (first[0] == true) {
+                elems.addAll(this.toList());
+                first[0] = false;
+            }
+            boolean[] found = {false};
+            while (other.tryAdvance(e -> {
+                if (elems.contains(e)&& !elems2.contains(e)) {
+                    cons.accept(e);
+                    elems2.add(e);
+                    found[0] = true;
+                }
+            }) && !found[0]) ;
+            return found[0];
+        };
     }
+
+    public default Query<T> limit(long maxSize) {
+        final int[] count = {0};
+        return action -> count[0]++ < maxSize ? tryAdvance(action) : false;
+    }
+
+    public static <T> Query<T> iter(T seed, UnaryOperator<T> accumulator){
+        T[] ss= (T[])new Object[]{seed};
+        return action-> {
+            action.accept(ss[0]); return (ss[0]=accumulator.apply(ss[0]))!=seed;
+        };
+    }
+
+    public default Query<T> skipWhile(Predicate<T> condition){
+        boolean[] b={true};
+        return action -> tryAdvance(t->{
+                if (!(b[0]=condition.test(t))) action.accept(t);
+
+        }
+        );
+
+
+    }
+
+    public static void main(String[] args) {
+        //Query.of(7,7,9,11,11,3,11,11,9,7).takeWhile2(n->n!=9).forEach(System.out::println);
+        //Query.iter(2, prev -> prev*2).limit(10).forEach(n -> System.out.print(n + " "));
+        Query.of(1, 2, 3, 4, 5).skipWhile(n -> n < 3).forEach(n -> System.out.print(n + " "));
+        /*Object[] yy=Query.of(7,7,9,11,9).takeWhile2(n->n!=5).array;
+
+        System.out.println(yy[0]);
+        System.out.println(yy[1]);
+        System.out.println(yy[2]);
+        System.out.println(yy[3]);
+        System.out.println(yy[4]);
+        Query.of(6,2,8,23,6,8,9).zip(Query.of(4,72,6,4),(q1,q2)->q1+q2).forEach(System.out::println);*/
+
+    }
+
+
 
 }
+
