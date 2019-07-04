@@ -1,8 +1,5 @@
 package FunctionalPrograms;
 
-import org.junit.Test;
-
-import static org.junit.Assert.assertEquals;
 @FunctionalInterface
 public interface MyToIntFunction<T> {
 
