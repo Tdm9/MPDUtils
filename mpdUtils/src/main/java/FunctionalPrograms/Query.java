@@ -135,7 +135,7 @@ public interface Query<T> {
 
 
 
-    
+
 
     public static void main(String[] args) {
         //Query.of(7,7,9,11,11,3,11,11,9,7).takeWhile2(n->n!=9).forEach(System.out::println);
